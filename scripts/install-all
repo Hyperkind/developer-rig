@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Configure the temporary directory.
+if [ "$(uname)" != "Darwin" ]; then
+	echo "This installer is for Mac only."
+	exit 1
+fi
+D=$(mktemp -d)
+
+# Clean up upon exit.
+on_exit() {
+	rm -rf $D
+}
+trap on_exit EXIT
+
+# Create utility functions.
+fail() {
+	echo "$1"
+	exit 1
+}
+check() {
+	[ $? -eq 0 ] || fail "Cannot $1."
+}
+
+# Download and install Git, if necessary.
+if ! git --version > /dev/null 2>&1; then
+	DMG="$D/git-2.6.2-intel-universal-mavericks.dmg"
+	curl -o "$DMG" 'https://phoenixnap.dl.sourceforge.net/project/git-osx-installer/git-2.6.2-intel-universal-mavericks.dmg'
+	check "download Git"
+	hdiutil attach "$DMG"
+	check "attach Git DMG file"
+	cd "/Volumes/Git 2.6.2 Mavericks Intel Universal"
+	sudo installer -pkg *.pkg -target /
+	check "install Git"
+	cd $HOME
+	hdiutil detach "/Volumes/Git 2.6.2 Mavericks Intel Universal"
+	rm $DMG
+fi
+
+# Download and install Node, if necessary.
+if ! node --version > /dev/null 2>&1; then
+	PKG="$D/node-v8.11.3.pkg"
+	curl -o "$PKG" 'https://nodejs.org/dist/v8.11.3/node-v8.11.3.pkg'
+	check "download Node"
+	sudo installer -pkg "$PKG" -target /
+	check "install Node"
+fi
+
+# Download and install Yarn, if necessary.
+if ! yarn --version > /dev/null 2>&1; then
+	curl -o- -L https://yarnpkg.com/install.sh | bash -s -- --rc
+	check "install Yarn"
+fi
