@@ -23,7 +23,10 @@ ECHO $client.DownloadFile^( $args[0], $args[1] ^) >> %DL%
 SET DL=powershell -file %DL%
 
 REM Download and invoke installers for Git, Node, Python 2, and Yarn.
-IF EXIST "%ProgramFiles%\Git\cmd\git.exe" GOTO skip_git
+IF EXIST "%ProgramFiles%\Git\cmd\git.exe" (
+	ECHO Git is already installed.
+	GOTO skip_git
+)
 ECHO Downloading Git...
 %DL% "https://github.com/git-for-windows/git/releases/download/v2.18.0.windows.1/Git-2.18.0-64-bit.exe" "%T%\Git-2.18.0-64-bit.exe"
 IF ERRORLEVEL 1 GOTO done
@@ -43,15 +46,24 @@ IF %ERRORLEVEL% == 3 (
 	GOTO done
 )
 :skip_git
-IF EXIST "%ProgramFiles%\nodejs\node.exe" GOTO skip_node
+IF EXIST "%ProgramFiles%\nodejs\node.exe" (
+	ECHO Node is already installed.
+	GOTO skip_node
+)
 CALL :doit Node "https://nodejs.org/dist/v8.11.3/node-v8.11.3-x64.msi"
 IF ERRORLEVEL 1 GOTO done
 :skip_node
-IF EXIST "%SystemDrive%\Python27\python.exe" GOTO skip_python
+IF EXIST "%SystemDrive%\Python27\python.exe" (
+	ECHO Python 2 is already installed.
+	GOTO skip_python
+)
 CALL :doit "Python 2" "https://www.python.org/ftp/python/2.7.15/python-2.7.15.amd64.msi" "ADDLOCAL=DefaultFeature,SharedCRT,Extensions,TclTk,Documentation,Tools,pip_feature,PrependPath"
 IF ERRORLEVEL 1 GOTO done
 :skip_python
-IF EXIST "%ProgramFiles(x86)%\Yarn\bin\yarn.cmd" GOTO skip_yarn
+IF EXIST "%ProgramFiles(x86)%\Yarn\bin\yarn.cmd" (
+	ECHO Yarn is already installed.
+	GOTO skip_yarn
+)
 CALL :doit Yarn "https://yarnpkg.com/latest.msi"
 IF ERRORLEVEL 1 GOTO done
 :skip_yarn
