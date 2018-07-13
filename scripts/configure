@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Configure the temporary directory.
+if [ "$(uname)" != "Darwin" ]; then
+	echo "This installer is for Mac only."
+	exit 1
+fi
+D=$(mktemp -d)
+
+# Clean up upon exit.
+on_exit() {
+	rm -rf $D
+}
+trap on_exit EXIT
+
+# Create utility functions.
+fail() {
+	echo "$1"
+	exit 1
+}
+check() {
+	[ $? -eq 0 ] || fail "Cannot $1."
+}
+
+grep -Fq localhost.rig.twitch.tv /etc/hosts || echo '127.0.0.1 localhost.rig.twitch.tv' | sudo tee -a /etc/hosts
+check 'update /etc/hosts.  Add "127.0.0.1 localhost.rig.twitch.tv" to /etc/hosts manually.'
+cd $(dirname $0)/..
+yarn install || check "install developer rig dependencies."
+yarn create-manifest -t panel -o ../panel.json || check "create panel extension manifest."
+if [ -d ../my-extension ]; then
+	pushd ../my-extension
+	git pull || fail 'This is not a valid "Hello World" extension directory.  Please move or remove it before running this script again.'
+	popd
+elif [ -e ../my-extension ]; then
+	fail 'There is already a file called "../my-extension".  Please move or remove it before running this script again.'
+else
+	yarn extension-init -d ../my-extension || check "initialize ../my-extension"
+fi
+pushd ../my-extension
+npm install || check 'install "Hello World" extension dependencies.'
+npm run cert || check 'create SSL certificates for the "Hello World" extension.'
+popd
