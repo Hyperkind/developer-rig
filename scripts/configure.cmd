@@ -1,15 +1,21 @@
 @ECHO OFF
 SETLOCAL
 
-SET T=%TEMP%\%RANDOM%
+REM Configure the temporary directory.
+SET T=%TEMP%\cnf%RANDOM%
 MD "%T%"
 
 REM Check for elevation.
+SET LOCALHOST=localhost.rig.twitch.tv
 SET HOSTS="%SystemRoot%\System32\drivers\etc\hosts"
-FIND localhost.rig.twitch.tv %HOSTS% > nul
-IF ERRORLEVEL 1 (
-	net file > nul 2> nul
+FIND "%LOCALHOST%" %HOSTS% > NUL
+IF ERRORLEVEL 1 SET CHECK_FOR_ELEVATION=YES
+powershell -Command "& {Get-ChildItem -Path Cert:\LocalMachine\Root}" | FIND "Twitch Developer Rig CA" > NUL
+IF ERRORLEVEL 1 SET CHECK_FOR_ELEVATION=YES
+IF "%CHECK_FOR_ELEVATION%" == "YES" (
+	net file > NUL 2> NUL
 	IF ERRORLEVEL 1 (
+		REM Continue installation in an elevated command prompt.
 		ECHO CreateObject ^( "Shell.Application" ^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments ^( 0 ^), "", "runas" > "%T%\elevate.vbs"
 		ECHO Installation will continue in an elevated command prompt.
 		cscript //nologo "%T%\elevate.vbs" "%~f0"
@@ -20,23 +26,27 @@ IF ERRORLEVEL 1 (
 )
 
 REM Add localhost.rig.twitch.tv to /etc/hosts.
-FIND localhost.rig.twitch.tv %HOSTS% > nul
-IF ERRORLEVEL 1 ECHO '127.0.0.1 localhost.rig.twitch.tv' >> %HOSTS%
+FIND "%LOCALHOST%" %HOSTS% > NUL
+IF ERRORLEVEL 1 ECHO 127.0.0.1 %LOCALHOST%>> %HOSTS%
+FIND "%LOCALHOST%" %HOSTS% > NUL
 IF ERRORLEVEL 1 (
-	ECHO Cannot update %HOSTS%.  Add "127.0.0.1 localhost.rig.twitch.tv" to %HOSTS% manually.
+	ECHO Cannot update %HOSTS%.  Add "127.0.0.1 %LOCALHOST%" to %HOSTS% manually.
 	GOTO done
 )
 
+REM Create CA and SSL certificates for the rig.
+CALL "%~dp0make-cert.cmd" -
+
 REM Install dependencies.
 CD /D "%~dp0.."
-yarn install
+CMD /C yarn install
 IF ERRORLEVEL 1 (
 	ECHO Cannot install developer rig dependencies.
 	GOTO done
 )
 
 REM Create a panel extension manifest file.
-yarn create-manifest -t panel -o ../panel.json
+CMD /C yarn create-manifest -t panel -o ../panel.json
 
 REM Clone and configure the "Hello World" extension from GitHub.
 SET MY=..\my-extension
@@ -52,19 +62,19 @@ IF EXIST %MY%\.git (
 	ECHO There is already a file called "%MY%".  Please move or remove it before running this script again.
 	GOTO done
 ) ELSE (
-	yarn extension-init -d %MY%
+	CMD /C yarn extension-init -d %MY%
 	IF ERRORLEVEL 1 (
 		ECHO Cannot initialize %MY%
 		GOTO done
 	)
 )
 PUSHD %MY%
-npm install
+CMD /C npm install
 IF ERRORLEVEL 1 (
 	ECHO Cannot install "Hello World" extension dependencies.
 	GOTO done
 )
-npm run cert
+CMD /C npm run cert
 IF ERRORLEVEL 1 (
 	ECHO Cannot create SSL certificates for the "Hello World" extension.
 	GOTO done
@@ -74,4 +84,5 @@ POPD
 :done
 SET EXIT_CODE=%ERRORLEVEL%
 RD /Q /S %T%
+%PAUSE%
 EXIT /B %EXIT_CODE%
