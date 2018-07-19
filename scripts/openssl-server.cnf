@@ -46,8 +46,6 @@ nsComment            = "OpenSSL Generated Certificate"
 ####################################################################
 [ alternate_names ]
 
-DNS.1 = localhost.rig.twitch.tv
-
 # IPv4 localhost
 IP.1  = 127.0.0.1
 

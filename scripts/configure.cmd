@@ -34,9 +34,6 @@ IF ERRORLEVEL 1 (
 	GOTO done
 )
 
-REM Create CA and SSL certificates for the rig.
-CALL "%~dp0make-cert.cmd" -
-
 REM Install dependencies.
 CD /D "%~dp0.."
 CMD /C yarn install
@@ -74,12 +71,10 @@ IF ERRORLEVEL 1 (
 	ECHO Cannot install "Hello World" extension dependencies.
 	GOTO done
 )
-CMD /C npm run cert
-IF ERRORLEVEL 1 (
-	ECHO Cannot create SSL certificates for the "Hello World" extension.
-	GOTO done
-)
 POPD
+
+REM Create CA and rig and localhost SSL certificates.
+CALL "%~dp0make-cert.cmd" -
 
 :done
 SET EXIT_CODE=%ERRORLEVEL%
