@@ -1,13 +1,14 @@
 @ECHO OFF
 SETLOCAL
 
+REM Create the temporary directory.
 SET T=%TEMP%\%RANDOM%
 MD "%T%"
 
 REM Check for elevation.
 net file > nul 2> nul
 IF ERRORLEVEL 1 (
-	ECHO CreateObject ^( "Shell.Application" ^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments ^( 0 ^), "", "runas" > "%T%\elevate.vbs"
+	ECHO CreateObject^("Shell.Application"^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments^(0^), "", "runas" > "%T%\elevate.vbs"
 	ECHO Installation will continue in an elevated command prompt.
 	cscript //nologo "%T%\elevate.vbs" "%~f0"
 	GOTO done
@@ -19,7 +20,7 @@ REM Create the PowerShell script to download installers.
 SET DL="%T%\dl.ps1"
 ECHO [Net.ServicePointManager]::SecurityProtocol = "tls12, tls11, tls" >> %DL%
 ECHO $client = new-object System.Net.WebClient >> %DL%
-ECHO $client.DownloadFile^( $args[0], $args[1] ^) >> %DL%
+ECHO $client.DownloadFile^($args[0], $args[1]^) >> %DL%
 SET DL=powershell -file %DL%
 
 REM Download and invoke installers for Git, Node, Python 2, and Yarn.

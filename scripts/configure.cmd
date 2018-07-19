@@ -1,37 +1,29 @@
 @ECHO OFF
 SETLOCAL
 
-REM Configure the temporary directory.
+REM Create the temporary directory.
 SET T=%TEMP%\cnf%RANDOM%
 MD "%T%"
 
 REM Check for elevation.
 SET LOCALHOST=localhost.rig.twitch.tv
 SET HOSTS="%SystemRoot%\System32\drivers\etc\hosts"
+SET REQUIRES_ELEVATION=NO
 FIND "%LOCALHOST%" %HOSTS% > NUL
-IF ERRORLEVEL 1 SET CHECK_FOR_ELEVATION=YES
+IF ERRORLEVEL 1 SET REQUIRES_ELEVATION=YES
 powershell -Command "& {Get-ChildItem -Path Cert:\LocalMachine\Root}" | FIND "Twitch Developer Rig CA" > NUL
-IF ERRORLEVEL 1 SET CHECK_FOR_ELEVATION=YES
-IF "%CHECK_FOR_ELEVATION%" == "YES" (
+IF ERRORLEVEL 1 SET REQUIRES_ELEVATION=YES
+IF "%REQUIRES_ELEVATION%" == "YES" (
 	net file > NUL 2> NUL
 	IF ERRORLEVEL 1 (
 		REM Continue installation in an elevated command prompt.
-		ECHO CreateObject ^( "Shell.Application" ^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments ^( 0 ^), "", "runas" > "%T%\elevate.vbs"
+		ECHO CreateObject^("Shell.Application"^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments^(0^), "", "runas" > "%T%\elevate.vbs"
 		ECHO Installation will continue in an elevated command prompt.
 		cscript //nologo "%T%\elevate.vbs" "%~f0"
 		GOTO done
 	) ELSE (
 		SET PAUSE=PAUSE
 	)
-)
-
-REM Add localhost.rig.twitch.tv to /etc/hosts.
-FIND "%LOCALHOST%" %HOSTS% > NUL
-IF ERRORLEVEL 1 ECHO 127.0.0.1 %LOCALHOST%>> %HOSTS%
-FIND "%LOCALHOST%" %HOSTS% > NUL
-IF ERRORLEVEL 1 (
-	ECHO Cannot update %HOSTS%.  Add "127.0.0.1 %LOCALHOST%" to %HOSTS% manually.
-	GOTO done
 )
 
 REM Install dependencies.
@@ -41,9 +33,6 @@ IF ERRORLEVEL 1 (
 	ECHO Cannot install developer rig dependencies.
 	GOTO done
 )
-
-REM Create a panel extension manifest file.
-CMD /C yarn create-manifest -t panel -o ../panel.json
 
 REM Clone and configure the "Hello World" extension from GitHub.
 SET MY=..\my-extension
@@ -72,6 +61,15 @@ IF ERRORLEVEL 1 (
 	GOTO done
 )
 POPD
+
+REM Add localhost.rig.twitch.tv to /etc/hosts.
+FIND "%LOCALHOST%" %HOSTS% > NUL
+IF ERRORLEVEL 1 ECHO 127.0.0.1 %LOCALHOST%>> %HOSTS%
+FIND "%LOCALHOST%" %HOSTS% > NUL
+IF ERRORLEVEL 1 (
+	ECHO Cannot update %HOSTS%.  Add "127.0.0.1 %LOCALHOST%" to %HOSTS% manually.
+	GOTO done
+)
 
 REM Create CA and rig and localhost SSL certificates.
 CALL "%~dp0make-cert.cmd" -
