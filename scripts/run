@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Check the platform.
+if [ "$(uname)" != "Darwin" ]; then
+	echo "This script is for Mac only."
+	exit 1
+fi
+
+# Create utility functions.
+fail() {
+	echo "$1"
+	exit 1
+}
+check() {
+	[ $? -eq 0 ] || fail "Cannot $1."
+}
+usage() {
+	echo "usage: $0 [-m manifest-file] [-f front-end-directory] [-b back-end-file]"
+	exit 2
+}
+
+# Collect command line parameters.
+ARGS=`getopt b:f:m:h $*`
+[ $? -eq 0 ] || usage
+set -- $ARGS
+for i; do
+	case "$i" in
+	-b)
+		BACKEND_FILE="$2";
+		[ -s "$BACKEND_FILE" ] || check "open back-end file '$BACKEND_FILE'"
+		shift; shift;;
+	-f)
+		FRONTEND_DIRECTORY="$2";
+		[ -d "$FRONTEND_DIRECTORY" ] || check "open front-end directory '$FRONTEND_DIRECTORY'"
+		shift; shift;;
+	-m)
+		MANIFEST_FILE="$2";
+		[ -s "$MANIFEST_FILE" ] || check "open manifest file '$MANIFEST_FILE'"
+		shift; shift;;
+	-h)
+		usage;;
+	--)
+		shift;
+		break;;
+	esac
+done
+[ $# -eq 0 ] || usage
+
+# For the "hello world" extension, ensure service of the correct directory.
+[ -d "$FRONTEND_DIRECTORY/public" ] && FRONTEND_DIRECTORY="$FRONTEND_DIRECTORY/public"
+
+# If necessary, create a panel extension manifest file.
+if [ -z "$MANIFEST_FILE" ]; then
+	MANIFEST_FILE=../panel.json
+	if [ -s "$MANIFEST_FILE" ]; then
+		echo "Using $MANIFEST_FILE."
+	else
+		echo "Creating $MANIFEST_FILE."
+		yarn create-manifest -t panel -o ../panel.json
+	fi
+fi
+
+# Start new processes for the different aspects of running the rig.
+NPROCESSES=0
+if [ -z "$FRONTEND_DIRECTORY" ]; then
+	echo "Front-end hosting was not provided by the developer rig."
+else
+	yarn host -d "$FRONTEND_DIRECTORY" -p 8080 -l &
+	NPROCESSES=$(expr $NPROCESSES + 1)
+fi
+if [ -z "$BACKEND_FILE" ]; then
+	echo "Back-end hosting was not provided by the developer rig."
+else
+	node "$BACKEND_FILE" -l "$MANIFEST_FILE" &
+	NPROCESSES=$(expr $NPROCESSES + 1)
+fi
+[ $NPROCESSES -gt 0 ] && echo "Started $NPROCESSES other processes to run the developer rig."
+yarn start -l "$MANIFEST_FILE"
