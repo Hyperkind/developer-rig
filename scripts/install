@@ -2,14 +2,14 @@
 
 # Configure the temporary directory.
 if [ "$(uname)" != "Darwin" ]; then
-	echo "This installer is for Mac only."
+	echo "This script is for Mac only."
 	exit 1
 fi
-D=$(mktemp -d)
+T=$(mktemp -d)
 
 # Clean up upon exit.
 on_exit() {
-	rm -rf $D
+	rm -rf $T
 }
 trap on_exit EXIT
 
@@ -24,7 +24,7 @@ check() {
 
 # Download and install Git, if necessary.
 if ! git --version > /dev/null 2>&1; then
-	DMG="$D/git-2.6.2-intel-universal-mavericks.dmg"
+	DMG="$T/git-2.6.2-intel-universal-mavericks.dmg"
 	curl -o "$DMG" 'https://phoenixnap.dl.sourceforge.net/project/git-osx-installer/git-2.6.2-intel-universal-mavericks.dmg'
 	check "download Git"
 	hdiutil attach "$DMG"
@@ -39,7 +39,7 @@ fi
 
 # Download and install Node, if necessary.
 if ! node --version > /dev/null 2>&1; then
-	PKG="$D/node-v8.11.3.pkg"
+	PKG="$T/node-v8.11.3.pkg"
 	curl -o "$PKG" 'https://nodejs.org/dist/v8.11.3/node-v8.11.3.pkg'
 	check "download Node"
 	sudo installer -pkg "$PKG" -target /

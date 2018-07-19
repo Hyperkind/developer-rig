@@ -1,17 +1,10 @@
 #!/bin/bash
 
-# Configure the temporary directory.
+# Check the platform.
 if [ "$(uname)" != "Darwin" ]; then
-	echo "This installer is for Mac only."
+	echo "This script is for Mac only."
 	exit 1
 fi
-D=$(mktemp -d)
-
-# Clean up upon exit.
-on_exit() {
-	rm -rf $D
-}
-trap on_exit EXIT
 
 # Create utility functions.
 fail() {
@@ -22,11 +15,11 @@ check() {
 	[ $? -eq 0 ] || fail "Cannot $1."
 }
 
-grep -Fq localhost.rig.twitch.tv /etc/hosts || echo '127.0.0.1 localhost.rig.twitch.tv' | sudo tee -a /etc/hosts
-check 'update /etc/hosts.  Add "127.0.0.1 localhost.rig.twitch.tv" to /etc/hosts manually.'
+# Install dependencies.
 cd $(dirname $0)/..
-yarn install || check "install developer rig dependencies."
-yarn create-manifest -t panel -o ../panel.json || check "create panel extension manifest."
+yarn install || check "install developer rig dependencies"
+
+# Clone and configure the "Hello World" extension from GitHub.
 if [ -d ../my-extension ]; then
 	pushd ../my-extension
 	git pull || fail 'This is not a valid "Hello World" extension directory.  Please move or remove it before running this script again.'
@@ -37,6 +30,12 @@ else
 	yarn extension-init -d ../my-extension || check "initialize ../my-extension"
 fi
 pushd ../my-extension
-npm install || check 'install "Hello World" extension dependencies.'
-npm run cert || check 'create SSL certificates for the "Hello World" extension.'
+npm install || check 'install "Hello World" extension dependencies'
 popd
+
+# Add localhost.rig.twitch.tv to /etc/hosts.
+grep -Fq localhost.rig.twitch.tv /etc/hosts || echo '127.0.0.1 localhost.rig.twitch.tv' | sudo tee -a /etc/hosts
+check 'update /etc/hosts.  Please add "127.0.0.1 localhost.rig.twitch.tv" to /etc/hosts manually before running this script again'
+
+# Create CA and rig and localhost SSL certificates.
+./scripts/make-cert
