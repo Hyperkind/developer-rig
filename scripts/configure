@@ -6,36 +6,51 @@ if [ "$(uname)" != "Darwin" ]; then
 	exit 1
 fi
 
+# Run the installation script first.
+$(dirname $0)/install || exit 1
+
 # Create utility functions.
 fail() {
 	echo "$1"
 	exit 1
 }
-check() {
+cannot() {
 	[ $? -eq 0 ] || fail "Cannot $1."
 }
 
 # Install dependencies.
 cd $(dirname $0)/..
-yarn install || check "install developer rig dependencies"
+[ -d node_modules ] || yarn install || cannot "install developer rig dependencies"
 
 # Clone and configure the "Hello World" extension from GitHub.
-if [ -d ../my-extension ]; then
-	pushd ../my-extension
-	git pull || fail 'This is not a valid "Hello World" extension directory.  Please move or remove it before running this script again.'
+WANTS_NPM_INSTALL=false
+MY=../my-extension
+MSG='update "Hello World" extension directory.  Please resolve the issue or move or remove it before running this script again'
+if [ -d $MY/.git ]; then
+	pushd $MY
+	git remote update || cannot "$MSG"
+	git status -uno | grep -Fq "up-to-date"
+	if [ $? -ne 0 ]; then
+		WANTS_NPM_INSTALL=true
+		git pull --ff-only || cannot "$MSG"
+	elif ! [ -d node_modules ]; then
+		WANTS_NPM_INSTALL=true
+	fi
 	popd
-elif [ -e ../my-extension ]; then
-	fail 'There is already a file called "../my-extension".  Please move or remove it before running this script again.'
+elif [ -e $MY ]; then
+	fail "There is already a file called '$MY'.  Please move or remove it before running this script again."
 else
-	yarn extension-init -d ../my-extension || check "initialize ../my-extension"
+	yarn extension-init -d $MY || cannot "create $MY"
 fi
-pushd ../my-extension
-npm install || check 'install "Hello World" extension dependencies'
+pushd $MY
+if $WANTS_NPM_INSTALL; then
+	npm install || cannot 'install "Hello World" extension dependencies'
+fi
 popd
 
 # Add localhost.rig.twitch.tv to /etc/hosts.
 grep -Fq localhost.rig.twitch.tv /etc/hosts || echo '127.0.0.1 localhost.rig.twitch.tv' | sudo tee -a /etc/hosts
-check 'update /etc/hosts.  Please add "127.0.0.1 localhost.rig.twitch.tv" to /etc/hosts manually before running this script again'
+cannot 'update /etc/hosts.  Please add "127.0.0.1 localhost.rig.twitch.tv" to /etc/hosts manually before running this script again'
 
 # Create CA and rig and localhost SSL certificates.
 ./scripts/make-cert
