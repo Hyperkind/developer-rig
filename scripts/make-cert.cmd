@@ -83,6 +83,7 @@ MOVE /Y cacert.pem "%D%..\ssl\cacert.crt" > NUL
 MOVE /Y cakey.pem "%D%..\ssl\cacert.key" > NUL
 MOVE /Y rigcert.pem "%D%..\ssl\selfsigned.crt" > NUL
 MOVE /Y rigkey.pem "%D%..\ssl\selfsigned.key" > NUL
+IF NOT EXIST "%D%..\..\my-extension\conf" MD "%D%..\..\my-extension\conf"
 MOVE /Y localhostcert.pem "%D%..\..\my-extension\conf\server.crt" > NUL
 MOVE /Y localhostkey.pem  "%D%..\..\my-extension\conf\server.key" > NUL
 IF ERRORLEVEL 1 (
@@ -102,6 +103,8 @@ REM If Firefox is installed, allow it to use the certificates in the local machi
 SET FF=%ProgramFiles%\Mozilla Firefox\defaults\pref
 IF EXIST "%FF%" (
 	ECHO pref^("security.enterprise_roots.enabled", true^); > "%FF%\twitch-developer-rig.js"
+	ECHO NOTE:  you must restart Firefox before running the developer rig.
+	SET PAUSE=PAUSE
 )
 
 :done

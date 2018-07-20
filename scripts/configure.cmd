@@ -6,39 +6,48 @@ SET T=%TEMP%\cnf%RANDOM%
 MD "%T%"
 
 REM Check for elevation.
-SET LOCALHOST=localhost.rig.twitch.tv
-SET HOSTS="%SystemRoot%\System32\drivers\etc\hosts"
-SET REQUIRES_ELEVATION=NO
-FIND "%LOCALHOST%" %HOSTS% > NUL
-IF ERRORLEVEL 1 SET REQUIRES_ELEVATION=YES
-powershell -Command "& {Get-ChildItem -Path Cert:\LocalMachine\Root}" | FIND "Twitch Developer Rig CA" > NUL
-IF ERRORLEVEL 1 SET REQUIRES_ELEVATION=YES
-IF "%REQUIRES_ELEVATION%" == "YES" (
-	net file > NUL 2> NUL
-	IF ERRORLEVEL 1 (
-		REM Continue installation in an elevated command prompt.
-		ECHO CreateObject^("Shell.Application"^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments^(0^), "", "runas" > "%T%\elevate.vbs"
-		ECHO Installation will continue in an elevated command prompt.
-		cscript //nologo "%T%\elevate.vbs" "%~f0"
-		GOTO done
-	) ELSE (
-		SET PAUSE=PAUSE
-	)
+CALL "%~dp0check-configure.cmd"
+IF ERRORLEVEL 1 (
+	REM Continue configuration in an elevated command prompt.
+	ECHO CreateObject^("Shell.Application"^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments^(0^), "", "runas" > "%T%\elevate.vbs"
+	ECHO Installation will continue in an elevated command prompt.
+	cscript //nologo "%T%\elevate.vbs" "%~f0 %~1"
+	GOTO done
+) ELSE IF "%~1" == "" (
+	SET PAUSE=PAUSE
+) ELSE (
+	SET PAUSE=
 )
+
+REM Run the installation script first.
+CALL "%~dp0install.cmd" -
+IF ERRORLEVEL 1 GOTO done
 
 REM Install dependencies.
 CD /D "%~dp0.."
-CMD /C yarn install
-IF ERRORLEVEL 1 (
-	ECHO Cannot install developer rig dependencies.
-	GOTO done
+IF NOT EXIST node_modules (
+	CMD /C yarn install
+	IF ERRORLEVEL 1 (
+		ECHO Cannot install developer rig dependencies.
+		GOTO done
+	)
 )
 
-REM Clone and configure the "Hello World" extension from GitHub.
+REM Clone from GitHub and configure the "Hello World" extension.
 SET MY=..\my-extension
+SET WANTS_NPM_INSTALL=NO
 IF EXIST %MY%\.git (
 	PUSHD %MY%
-	git pull
+	git remote update
+	IF NOT ERRORLEVEL 1 (
+		git status -uno | FIND "up to date" > NUL
+		IF ERRORLEVEL 1 (
+			SET WANTS_NPM_INSTALL=YES
+			git pull --ff-only
+		) ELSE IF NOT EXIST node_modules (
+			SET WANTS_NPM_INSTALL=YES
+		)
+	)
 	IF ERRORLEVEL 1 (
 		ECHO This is not a valid "Hello World" extension directory.  Please move or remove it before running this script again.
 		GOTO done
@@ -55,19 +64,24 @@ IF EXIST %MY%\.git (
 	)
 )
 PUSHD %MY%
-CMD /C npm install
-IF ERRORLEVEL 1 (
-	ECHO Cannot install "Hello World" extension dependencies.
-	GOTO done
+IF "%WANTS_NPM_INSTALL%" == "YES" (
+	CMD /C npm install
+	IF ERRORLEVEL 1 (
+		ECHO Cannot install "Hello World" extension dependencies.
+		GOTO done
+	)
 )
 POPD
 
 REM Add localhost.rig.twitch.tv to /etc/hosts.
-FIND "%LOCALHOST%" %HOSTS% > NUL
-IF ERRORLEVEL 1 ECHO 127.0.0.1 %LOCALHOST%>> %HOSTS%
-FIND "%LOCALHOST%" %HOSTS% > NUL
+SET LOCALHOST=localhost.rig.twitch.tv
+SET HOSTS_FILE=%SystemRoot%\System32\drivers\etc\hosts
+FIND "%LOCALHOST%" "%HOSTS_FILE%" > NUL
+IF ERRORLEVEL 1 ECHO 127.0.0.1 %LOCALHOST%>> "%HOSTS_FILE%"
+FIND "%LOCALHOST%" "%HOSTS_FILE%" > NUL
 IF ERRORLEVEL 1 (
-	ECHO Cannot update %HOSTS%.  Add "127.0.0.1 %LOCALHOST%" to %HOSTS% manually.
+	ECHO Cannot update "%HOSTS_FILE%".
+	ECHO Add "127.0.0.1 %LOCALHOST%" to "%HOSTS_FILE%" manually.
 	GOTO done
 )
 
@@ -76,6 +90,6 @@ CALL "%~dp0make-cert.cmd" -
 
 :done
 SET EXIT_CODE=%ERRORLEVEL%
+IF NOT %EXIT_CODE% == 0 %PAUSE% TYPE NUL
 RD /Q /S %T%
-%PAUSE%
 EXIT /B %EXIT_CODE%

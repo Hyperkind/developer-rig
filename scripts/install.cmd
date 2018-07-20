@@ -6,14 +6,16 @@ SET T=%TEMP%\%RANDOM%
 MD "%T%"
 
 REM Check for elevation.
-net file > nul 2> nul
+CALL "%~dp0check-install.cmd"
 IF ERRORLEVEL 1 (
 	ECHO CreateObject^("Shell.Application"^).ShellExecute "cmd.exe", "/c " ^& WScript.Arguments^(0^), "", "runas" > "%T%\elevate.vbs"
 	ECHO Installation will continue in an elevated command prompt.
-	cscript //nologo "%T%\elevate.vbs" "%~f0"
+	cscript //nologo "%T%\elevate.vbs" "%~f0 %~1"
 	GOTO done
-) ELSE (
+) ELSE IF "%~1" == "" (
 	SET PAUSE=PAUSE
+) ELSE (
+	SET PAUSE=
 )
 
 REM Create the PowerShell script to download installers.
@@ -77,6 +79,7 @@ IF NOT %EXIT_CODE% == 0 (
 	ECHO Installation failed
 ) ELSE IF "%MUST_RESTART%" == "yes" (
 	ECHO You must restart your machine before using the Developer Rig.
+	SET PAUSE=PAUSE
 )
 %PAUSE%
 EXIT /B %EXIT_CODE%
